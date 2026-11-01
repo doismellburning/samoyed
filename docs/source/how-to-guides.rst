@@ -931,6 +931,7 @@ Try out the BBS
 ---------------
 
 ``samoyed-bbs`` keeps messages for users to list, read and send.
+It is experimental, so don't rely on it for mail that matters.
 Stations reach it over the air through ``samoyed-direwolf``'s AGW port,
 and a session on its own console
 needs nothing but a configuration file naming the BBS and its message database:

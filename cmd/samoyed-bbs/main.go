@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// samoyed-bbs is a packet BBS.  Stations reach it over the air through an AGW
+// samoyed-bbs is a packet BBS, and an experimental one.  Stations reach it over the air through an AGW
 // server, such as samoyed-direwolf; --console runs a session on this terminal
 // instead, as a given callsign.
 package main
@@ -31,6 +31,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// experimentalWarning is logged on starting up, until the BBS is ready to be
+// relied on.
+const experimentalWarning = "samoyed-bbs is experimental: expect missing features and changes, " +
+	"including to its message database, and don't rely on it for mail that matters."
+
 func main() {
 	var configFile = pflag.StringP("config", "c", "samoyed-bbs.yaml", "Configuration file.")
 	var configCheck = pflag.Bool("config-check", false, "Check the configuration file and exit.  Exit status is non-zero if it has errors in it.")
@@ -39,7 +44,8 @@ func main() {
 	var help = pflag.Bool("help", false, "Display help text.")
 
 	pflag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "%s - packet BBS\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "%s - packet BBS (experimental)\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Experimental: expect missing features and changes, including to its message\ndatabase, and don't rely on it for mail that matters.\n\n")
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])
 		pflag.PrintDefaults()
 	}
@@ -72,6 +78,8 @@ func run(configFile string, configCheck bool, consoleCall string, verbose bool, 
 
 		return 0
 	}
+
+	logrus.Warn(experimentalWarning)
 
 	var ctx, stop = signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

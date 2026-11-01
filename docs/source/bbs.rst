@@ -7,6 +7,16 @@ BBS
 
 .. ai-label:: generated
 
+.. warning::
+
+    ``samoyed-bbs`` is experimental.
+    Expect missing features, and changes - to its configuration, to what it sends other BBSes,
+    and to its message database - without notice,
+    and don't rely on it for mail that matters.
+    In particular, it can't yet forward mail to other BBSes,
+    and the ``R:`` lines it writes haven't been checked against other BBSes' (see below).
+    It says so when it starts, in ``--help``, and in the banner it greets stations with.
+
 ``samoyed-bbs`` is a packet bulletin board:
 users leave personal messages for each other and bulletins for everyone,
 and list, read and kill them.
@@ -33,7 +43,7 @@ Check it, then start a session as yourself:
     Configuration file samoyed-bbs.yaml is OK.
 
     $ samoyed-bbs -c samoyed-bbs.yaml --console Q1TEST
-    Welcome to Q1BBS, a Samoyed BBS.
+    Welcome to Q1BBS, a Samoyed BBS (experimental).
     [SAMBBS-0.0-$]
     de Q1BBS>
 
@@ -105,7 +115,7 @@ Configuration
 ``banner``
     What a station is greeted with.
     Use ``|`` for several lines.
-    Left out, it says which BBS this is.
+    Left out, it says which BBS this is, and that it is experimental.
 
 ``prompt``
     What a user is prompted with for each command.
