@@ -269,3 +269,89 @@ func TestAStationGoneBeforeTheGreeting(t *testing.T) {
 
 	require.Error(t, d.Serve(t.Context(), s), "nobody there to greet")
 }
+
+func TestABusyPartnerIsTurnedAway(t *testing.T) {
+	t.Parallel()
+
+	var cfg = testConfig()
+
+	cfg.Forwarder = func(_ transport.Peer, theirs sid.SID) maybe.Maybe[Machine] {
+		return maybe.Just[Machine](&forwarding{theirs: theirs})
+	}
+	cfg.Busy = new(Busy)
+
+	cfg.Busy.TryAcquire("Q2TEST")
+
+	var station, r, done = start(t, cfg)
+
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
+
+	say(t, station, "[FBB-7.0-ABFHM$]")
+	expect(t, r, "Already forwarding with Q2TEST, so disconnecting.  73.")
+
+	require.NoError(t, result(t, done))
+}
+
+func TestForwardingHoldsThePartnerBusy(t *testing.T) {
+	t.Parallel()
+
+	var cfg = testConfig()
+
+	cfg.Forwarder = func(_ transport.Peer, theirs sid.SID) maybe.Maybe[Machine] {
+		return maybe.Just[Machine](&forwarding{theirs: theirs})
+	}
+	cfg.Busy = new(Busy)
+
+	var station, r, done = start(t, cfg)
+
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
+
+	say(t, station, "[FBB-7.0-ABFHM$]")
+	expect(t, r, "forwarding with FBB")
+	assert.False(t, cfg.Busy.TryAcquire("Q2TEST"), "busy while forwarding")
+
+	say(t, station, "*** DONE")
+	require.NoError(t, result(t, done))
+	assert.True(t, cfg.Busy.TryAcquire("Q2TEST"), "free once done")
+}
+
+func TestDrive(t *testing.T) {
+	t.Parallel()
+
+	var drive = func(t *testing.T) (net.Conn, *lines.Reader, <-chan error) {
+		t.Helper()
+
+		var s, station = memt.Pair(transport.Peer{Call: "Q3BBS", Kind: transport.Memory, Authenticated: false})
+
+		t.Cleanup(func() { _ = station.Close() })
+
+		var d = New(testConfig(), func(peer transport.Peer) *echo { return &echo{peer: peer} })
+		var done = make(chan error, 1)
+
+		go func() { done <- d.Drive(t.Context(), s, lines.NewReader(s, 64), &forwarding{theirs: sid.Ours(0, 0)}) }()
+
+		return station, lines.NewReader(station, 1024), done
+	}
+
+	t.Run("until the machine disconnects", func(t *testing.T) {
+		t.Parallel()
+
+		var station, r, done = drive(t)
+
+		expect(t, r, "forwarding with SAMBBS")
+		say(t, station, "F>")
+		expect(t, r, "forwarding got F>")
+		say(t, station, "*** DONE")
+		require.NoError(t, result(t, done))
+	})
+
+	t.Run("or the station leaves first", func(t *testing.T) {
+		t.Parallel()
+
+		var station, r, done = drive(t)
+
+		expect(t, r, "forwarding with SAMBBS")
+		require.NoError(t, station.Close())
+		require.ErrorIs(t, result(t, done), io.EOF)
+	})
+}

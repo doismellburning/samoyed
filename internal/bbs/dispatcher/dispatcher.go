@@ -50,6 +50,10 @@ type Config struct {
 	// machine to forward mail with it, if it is a partner.  Left nil, no
 	// station is.
 	Forwarder func(peer transport.Peer, theirs sid.SID) maybe.Maybe[Machine]
+
+	// Busy, if given, is the partners forwarding now, so that one calling
+	// in while this BBS is already forwarding with it is turned away.
+	Busy *Busy
 }
 
 // Dispatcher runs sessions.
@@ -103,28 +107,66 @@ func (d *Dispatcher) serve(ctx context.Context, s transport.Session, peer transp
 
 	var reader = lines.NewReader(s, d.cfg.MaxLineLen)
 
-	for first := true; ; first = false {
-		var line, readErr = d.readLine(ctx, reader)
-		if readErr != nil {
-			return d.ended(ctx, s, readErr)
+	var line, readErr = d.readLine(ctx, reader)
+	if readErr != nil {
+		return d.ended(ctx, s, readErr)
+	}
+
+	if sid.IsSID(strings.TrimSpace(line)) {
+		return d.forward(ctx, s, reader, peer, strings.TrimSpace(line))
+	}
+
+	var done, err = perform(s, m.Line(ctx, line))
+	if err != nil || done {
+		return err
+	}
+
+	return d.ended(ctx, s, d.loop(ctx, s, reader, m))
+}
+
+// forward hands a session that opened with a SID to the partner's
+// forwarding machine, unless it isn't a partner or is already forwarding.
+func (d *Dispatcher) forward(ctx context.Context, s transport.Session, reader *lines.Reader, peer transport.Peer, line string) error {
+	var forwarder, ok = d.forwarder(peer, line).Get()
+	if !ok {
+		return lines.Write(s, peer.Call+" isn't a forwarding partner of this BBS.  73.")
+	}
+
+	if d.cfg.Busy != nil {
+		if !d.cfg.Busy.TryAcquire(peer.Call) {
+			return lines.Write(s, "Already forwarding with "+peer.Call+", so disconnecting.  73.")
 		}
 
-		if first && sid.IsSID(strings.TrimSpace(line)) {
-			var forwarder, ok = d.forwarder(peer, strings.TrimSpace(line)).Get()
-			if !ok {
-				return lines.Write(s, peer.Call+" isn't a forwarding partner of this BBS.  73.")
-			}
+		defer d.cfg.Busy.Release(peer.Call)
+	}
 
-			logrus.WithField("station", peer.Call).Info("Forwarding mail")
+	logrus.WithField("station", peer.Call).Info("Forwarding mail")
 
-			m = forwarder
+	return d.ended(ctx, s, d.Drive(ctx, s, reader, forwarder))
+}
 
-			var done, err = perform(s, m.Start())
-			if err != nil || done {
-				return err
-			}
+// Drive runs m over a session: its Start, and then each line the station
+// sends, until m disconnects, which is a nil error.  The station leaving
+// first is io.EOF, saying nothing for IdleTimeout is
+// context.DeadlineExceeded, and anything else is as the session failed.
+// Serve uses it once it knows what the session is; a session this BBS
+// opened is driven with it from the start, reading through reader.
+func (d *Dispatcher) Drive(ctx context.Context, s transport.Session, reader *lines.Reader, m Machine) error {
+	var done, err = perform(s, m.Start())
+	if err != nil || done {
+		return err
+	}
 
-			continue
+	return d.loop(ctx, s, reader, m)
+}
+
+// loop passes each line the station sends to m, and does what it says,
+// until m disconnects or the session ends.
+func (d *Dispatcher) loop(ctx context.Context, s transport.Session, reader *lines.Reader, m Machine) error {
+	for {
+		var line, readErr = d.readLine(ctx, reader)
+		if readErr != nil {
+			return readErr
 		}
 
 		var done, err = perform(s, m.Line(ctx, line))
