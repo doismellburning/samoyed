@@ -20,6 +20,7 @@ concurrency:
 jobs:
   conventional_commits:
     runs-on: "ubuntu-latest"
+    timeout-minutes: 5
     steps:
     # The merge commit GitHub builds for a pull request is not itself in the
     # history being merged, so fetch everything and ask about the real range.
@@ -37,6 +38,7 @@ jobs:
 
   no_merge_commits:
     runs-on: "ubuntu-latest"
+    timeout-minutes: 5
     steps:
     # As above: fetch everything and ask about the real range, which a
     # retargeted pull request changes - hence this running on "edited" too.

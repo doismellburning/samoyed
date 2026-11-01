@@ -23,6 +23,7 @@ concurrency:
 jobs:
   generate_version:
     runs-on: "ubuntu-latest"
+    timeout-minutes: 5
     outputs:
       SAMOYED_VERSION: "${{ steps.version.outputs.SAMOYED_VERSION }}"
     steps:
@@ -43,6 +44,7 @@ jobs:
           - "ubuntu-24.04-arm"
           - "macos-latest"
     runs-on: "${{ matrix.runner }}"
+    timeout-minutes: 30
     steps:
     - uses: "actions/checkout@v7"
     - uses: "actions/setup-go@v7"
@@ -54,6 +56,7 @@ jobs:
       run: echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> "$GITHUB_ENV"
     # Each job installs only the dev-setup.sh groups it needs.
     - name: "Install dependencies"
+      timeout-minutes: 10
       run: "./dev-setup.sh build test gpsd-apparmor"
     - run: "make stats"
     - run: "make cmds"
@@ -96,12 +99,14 @@ jobs:
       matrix:
         runner: *runners
     runs-on: "${{ matrix.runner }}"
+    timeout-minutes: 20
     steps:
     - uses: "actions/checkout@v7"
     - uses: "actions/setup-go@v7"
       with:
         go-version: "1.27"
     - name: "Install dependencies"
+      timeout-minutes: 10
       run: "./dev-setup.sh build lint"
     - run: "make check"
     - name: "Ensure nothing got fixed (i.e. everything was already fine)"
@@ -115,6 +120,7 @@ jobs:
   # each target its own runner instead.
   fuzz_targets:
     runs-on: "ubuntu-latest"
+    timeout-minutes: 5
     outputs:
       targets: "${{ steps.list.outputs.targets }}"
     steps:
@@ -133,6 +139,7 @@ jobs:
   fuzz_target:
     needs: ["fuzz_targets"]
     runs-on: "ubuntu-latest"
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -144,6 +151,7 @@ jobs:
       with:
         go-version: "1.27"
     - name: "Install dependencies"
+      timeout-minutes: 10
       run: "./dev-setup.sh build"
     - name: "Fuzz ${{ matrix.target }}"
       run: "make fuzz FUZZ_PKGS=${{ matrix.pkg }} FUZZ_TARGET=${{ matrix.target }}"
@@ -156,6 +164,7 @@ jobs:
     if: "always()"
     needs: ["fuzz_target"]
     runs-on: "ubuntu-latest"
+    timeout-minutes: 5
     steps:
     - name: "Check every target passed"
       run: "test '${{ needs.fuzz_target.result }}' = 'success'"
@@ -166,12 +175,14 @@ jobs:
   # rather than slowing each of build_and_test's three.
   race:
     runs-on: "ubuntu-latest"
+    timeout-minutes: 30
     steps:
     - uses: "actions/checkout@v7"
     - uses: "actions/setup-go@v7"
       with:
         go-version: "1.27"
     - name: "Install dependencies"
+      timeout-minutes: 10
       run: "./dev-setup.sh build test gpsd-apparmor"
     - name: "Test with the race detector"
       run: "make race"
@@ -200,6 +211,7 @@ jobs:
       # whether and what to publish on main, rather than check the change.
       UNGATED: "should_release release docs-deploy"
     runs-on: "ubuntu-latest"
+    timeout-minutes: 5
     steps:
     - uses: "actions/checkout@v7"
       with:
@@ -224,6 +236,7 @@ jobs:
 
   should_release:
     runs-on: "ubuntu-latest"
+    timeout-minutes: 5
     outputs:
       result: "${{ steps.check.outputs.result }}"
     steps:
@@ -240,6 +253,7 @@ jobs:
       (github.ref == 'refs/heads/main' && needs.should_release.outputs.result == 'true')
     needs: [generate_version, build_and_test, check, fuzz, race, should_release]
     runs-on: "ubuntu-latest"
+    timeout-minutes: 15
     permissions:
       contents: "write"
     steps:
@@ -267,6 +281,7 @@ jobs:
 
   docs:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     defaults:
       run:
@@ -287,6 +302,7 @@ jobs:
           enable-cache: true
       - run: ./dev-setup.sh docs
         working-directory: "."
+        timeout-minutes: 10
       - run: make bootstrap
       - run: make check
       - run: make dirhtml
@@ -302,6 +318,7 @@ jobs:
     environment:
       name: github-pages
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: docs
     permissions:
       pages: write
