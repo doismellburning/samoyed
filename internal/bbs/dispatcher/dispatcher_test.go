@@ -11,10 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/bbs/action"
+	"github.com/doismellburning/samoyed/internal/bbs/forward/sid"
 	"github.com/doismellburning/samoyed/internal/bbs/lines"
-	"github.com/doismellburning/samoyed/internal/bbs/shell"
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
 	"github.com/doismellburning/samoyed/internal/bbs/transport/memt"
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,21 +24,21 @@ import (
 // echo is a shell that answers each line by repeating it, and says bye to BYE.
 type echo struct{ peer transport.Peer }
 
-func (e *echo) Start() []shell.Action { return []shell.Action{shell.Prompt{Text: "de Q1BBS>"}} }
+func (e *echo) Start() []action.Action { return []action.Action{action.Prompt{Text: "de Q1BBS>"}} }
 
-func (e *echo) Line(_ context.Context, line string) []shell.Action {
+func (e *echo) Line(_ context.Context, line string) []action.Action {
 	if line == "BYE" {
-		return []shell.Action{shell.Output{Lines: []string{"73"}}, shell.Disconnect{}}
+		return []action.Action{action.Output{Lines: []string{"73"}}, action.Disconnect{}}
 	}
 
-	return []shell.Action{shell.Output{Lines: []string{e.peer.Call + " said " + line}}, shell.Prompt{Text: "de Q1BBS>"}}
+	return []action.Action{action.Output{Lines: []string{e.peer.Call + " said " + line}}, action.Prompt{Text: "de Q1BBS>"}}
 }
 
 func testConfig() Config {
 	var cfg = new(Config)
 
 	cfg.Banner = []string{"Welcome to Q1BBS."}
-	cfg.SID = "[SAMBBS-0.0-$]"
+	cfg.SID = "[SAMBBS-0.0-H$]"
 	cfg.IdleTimeout = 5 * time.Second
 	cfg.MaxLineLen = 32
 
@@ -99,7 +101,7 @@ func TestASession(t *testing.T) {
 
 	var station, r, done = start(t, testConfig())
 
-	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
 
 	say(t, station, "L")
 	expect(t, r, "Q2TEST said L", "de Q1BBS>")
@@ -118,10 +120,70 @@ func TestASIDIsTurnedAway(t *testing.T) {
 
 	var station, r, done = start(t, testConfig())
 
-	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
 
 	say(t, station, "[FBB-7.0-ABFHM$]")
-	expect(t, r, "This BBS doesn't forward mail yet.  73.")
+	expect(t, r, "Q2TEST isn't a forwarding partner of this BBS.  73.")
+
+	require.NoError(t, result(t, done))
+}
+
+// forwarding is a forwarding machine that says what SID the partner opened
+// with, and hangs up when it says *** DONE.
+type forwarding struct{ theirs sid.SID }
+
+func (f *forwarding) Start() []action.Action {
+	return []action.Action{action.Output{Lines: []string{"forwarding with " + f.theirs.Name}}}
+}
+
+func (f *forwarding) Line(_ context.Context, line string) []action.Action {
+	if line == "*** DONE" {
+		return []action.Action{action.Disconnect{}}
+	}
+
+	return []action.Action{action.Output{Lines: []string{"forwarding got " + line}}}
+}
+
+func TestAPartnersSIDStartsForwarding(t *testing.T) {
+	t.Parallel()
+
+	var cfg = testConfig()
+	var asked []string
+
+	cfg.Forwarder = func(peer transport.Peer, theirs sid.SID) maybe.Maybe[Machine] {
+		asked = append(asked, peer.Call)
+
+		return maybe.Just[Machine](&forwarding{theirs: theirs})
+	}
+
+	var station, r, done = start(t, cfg)
+
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
+
+	say(t, station, " [FBB-7.0-ABFHM$] ")
+	expect(t, r, "forwarding with FBB")
+
+	say(t, station, "F>")
+	expect(t, r, "forwarding got F>")
+
+	say(t, station, "*** DONE")
+	require.NoError(t, result(t, done))
+	assert.Equal(t, []string{"Q2TEST"}, asked)
+}
+
+func TestAStrangersSIDIsTurnedAway(t *testing.T) {
+	t.Parallel()
+
+	var cfg = testConfig()
+
+	cfg.Forwarder = func(transport.Peer, sid.SID) maybe.Maybe[Machine] { return maybe.Nothing[Machine]() }
+
+	var station, r, done = start(t, cfg)
+
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
+
+	say(t, station, "[FBB-7.0-ABFHM$]")
+	expect(t, r, "Q2TEST isn't a forwarding partner of this BBS.  73.")
 
 	require.NoError(t, result(t, done))
 }
@@ -131,7 +193,7 @@ func TestASIDLaterIsJustALine(t *testing.T) {
 
 	var station, r, _ = start(t, testConfig())
 
-	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
 
 	say(t, station, "L")
 	expect(t, r, "Q2TEST said L", "de Q1BBS>")
@@ -145,7 +207,7 @@ func TestTheStationLeaving(t *testing.T) {
 
 	var station, r, done = start(t, testConfig())
 
-	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
 	require.NoError(t, station.Close())
 
 	require.NoError(t, result(t, done))
@@ -159,7 +221,7 @@ func TestIdleTimeout(t *testing.T) {
 
 	var _, r, done = start(t, cfg)
 
-	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>", "Nothing heard for 50ms, so disconnecting.  73.")
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>", "Nothing heard for 50ms, so disconnecting.  73.")
 
 	require.NoError(t, result(t, done))
 }
@@ -169,7 +231,7 @@ func TestOverlongLine(t *testing.T) {
 
 	var station, r, done = start(t, testConfig())
 
-	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
 
 	go func() { _, _ = station.Write([]byte(strings.Repeat("x", 100))) }()
 
@@ -190,7 +252,7 @@ func TestShuttingDown(t *testing.T) {
 
 	go func() { done <- d.Serve(ctx, s) }()
 
-	expect(t, lines.NewReader(station, 1024), "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	expect(t, lines.NewReader(station, 1024), "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
 	cancel()
 
 	require.NoError(t, result(t, done))
@@ -206,16 +268,4 @@ func TestAStationGoneBeforeTheGreeting(t *testing.T) {
 	var d = New(testConfig(), func(peer transport.Peer) *echo { return &echo{peer: peer} })
 
 	require.Error(t, d.Serve(t.Context(), s), "nobody there to greet")
-}
-
-func TestIsSID(t *testing.T) {
-	t.Parallel()
-
-	for _, sid := range []string{"[FBB-7.0-ABFHM$]", "[BPQ-6.0.24.1-B1FIHJM$]", "[SAMBBS-0.0-$]", "[MBL-5.14-H$]"} {
-		assert.True(t, IsSID(sid), sid)
-	}
-
-	for _, line := range []string{"", "L", "[FBB]", "FBB-7.0-ABFHM$", "[FBB-7.0-ABFHM$] extra", "[a b-1-$]"} {
-		assert.False(t, IsSID(line), line)
-	}
 }

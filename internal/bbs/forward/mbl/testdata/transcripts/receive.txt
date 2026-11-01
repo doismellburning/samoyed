@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# A partner that has connected sends two messages and hands over; with
+# nothing queued for it, this side is done at once.
+@answering [FBB-7.0-ABFHM$]
+< de Q1BBS>
+> SP Q1TEST @ Q1BBS.#77.GBR.EURO < Q9TEST $12_Q2BBS
+< OK
+> Hello
+> R:261031/1200Z @:Q2BBS.GBR.EURO
+> How are you?
+> /EX
+< de Q1BBS>
+> SB ALL @ GBR < Q9TEST $13_Q2BBS
+< OK
+> News
+> Last line.^Z
+< de Q1BBS>
+@check accepted=2 forwarded=0 refused=0 pending=0
+> F>
+< *** DONE
+< *** disconnected

@@ -16,27 +16,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/bbs/action"
 	"github.com/doismellburning/samoyed/internal/bbs/mail"
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
-// Action is something to do in answer to a line.
-type Action interface{ isAction() }
+// Action is something to do in answer to a line; see package action.
+type Action = action.Action
 
 // Output is lines to send the user.
-type Output struct{ Lines []string }
+type Output = action.Output
 
 // Prompt is the prompt to send the user, when the machine is ready for its
 // next command.
-type Prompt struct{ Text string }
+type Prompt = action.Prompt
 
 // Disconnect is ending the session.
-type Disconnect struct{}
-
-func (Output) isAction()     {}
-func (Prompt) isAction()     {}
-func (Disconnect) isAction() {}
+type Disconnect = action.Disconnect
 
 // mailbox is what the shell needs of the message store.
 type mailbox interface {
@@ -399,7 +396,7 @@ func (m *Machine) bodyLine(ctx context.Context, line string) []Action {
 		body.WriteString(l + "\r")
 	}
 
-	d.message.Body = mail.PrependRLine([]byte(body.String()), m.rline())
+	d.message.Body = mail.Stamp([]byte(body.String()), m.cfg.Call, m.cfg.HRoute, m.now())
 
 	var stored, err = m.box.Accept(ctx, d.message, m.cfg.Call)
 	if errors.Is(err, mail.ErrDuplicateBID) {
@@ -464,19 +461,11 @@ func (m *Machine) killOne(ctx context.Context, field string) string {
 	return fmt.Sprintf("Message %d killed.", n)
 }
 
-// rline is the R: line for a message taken now.
-func (m *Machine) rline() mail.RLine {
-	var now = time.Now
-
+// now is the time, for R: lines.
+func (m *Machine) now() time.Time {
 	if m.cfg.Now != nil {
-		now = m.cfg.Now
+		return m.cfg.Now()
 	}
 
-	var r = new(mail.RLine)
-
-	r.When = now().UTC()
-	r.BBS = baseCall(m.cfg.Call)
-	r.HRoute = m.cfg.HRoute
-
-	return *r
+	return time.Now()
 }

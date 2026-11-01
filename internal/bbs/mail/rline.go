@@ -205,3 +205,19 @@ func Path(body []byte) []string {
 func PrependRLine(body []byte, r RLine) []byte {
 	return append([]byte(r.String()+"\r"), body...)
 }
+
+// Stamp puts the R: line of a BBS taking a message at the top of its body:
+// bbsCall, without its SSID, with the rest of its hierarchical address if
+// given, taking it at when.  Any R: lines the message already has stay below,
+// so the newest is first.
+func Stamp(body []byte, bbsCall string, hroute maybe.Maybe[string], when time.Time) []byte {
+	var base, _, _ = strings.Cut(strings.ToUpper(bbsCall), "-")
+
+	var r = new(RLine)
+
+	r.When = when.UTC()
+	r.BBS = base
+	r.HRoute = hroute
+
+	return PrependRLine(body, *r)
+}

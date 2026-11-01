@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Calling a partner: its greeting and SID, then its prompt, which this side
+# answers with its own SID.  The next prompt starts this side's turn, and its
+# end hands over; the partner's turn ends with *** DONE.
+@queued SP Q1TEST @ Q2BBS < Q9TEST $5_Q1BBS
+@calling
+> Welcome to Q2BBS.
+> [FBB-7.0-ABFHM$]
+> Q2BBS>
+< [SAMBBS-0.0-H$]
+> Q2BBS>
+< SP Q1TEST @ Q2BBS < Q9TEST $5_Q1BBS
+> OK
+< Title 1
+< R:261031/1200Z @:Q1BBS.#77.GBR.EURO
+< Body 1.
+< /EX
+> Q2BBS>
+< F>
+> SP Q1TEST @ Q1BBS < Q9TEST $40_Q2BBS
+< OK
+> Back to you
+> Hi.
+> /EX
+< de Q1BBS>
+> *** DONE
+< *** disconnected
+@check accepted=1 forwarded=1 refused=0 pending=0
