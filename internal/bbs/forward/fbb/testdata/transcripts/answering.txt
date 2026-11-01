@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# A partner that has connected sends its proposal straight after its SID:
+# this side wants the first, has seen the second, and refuses the second
+# again when it is offered twice.  The message wanted ends with a Ctrl-Z on a
+# line of its own; with nothing to send back, this side says FF.
+@seen 41_Q2BBS
+@answering
+> FB P Q2TEST Q1BBS Q1TEST 40_Q2BBS 12
+> FB B Q2TEST GBR ALL 41_Q2BBS 10
+> FB B Q2TEST GBR ALL 41_Q2BBS 10
+> F> E3
+< FS +--
+> Hello
+> First line.
+> ^Z
+< FF
+> FQ
+< *** disconnected
+@check accepted=1 forwarded=0 refused=0 pending=0

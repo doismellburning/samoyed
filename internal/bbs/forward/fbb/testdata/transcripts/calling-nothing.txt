@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Calling with nothing to send: this side's SID and FF, and the partner, with
+# nothing either, says FQ.
+@calling
+< [SAMBBS-0.0-FH$]
+< FF
+> FQ
+< *** disconnected
+@check accepted=0 forwarded=0 refused=0 pending=0

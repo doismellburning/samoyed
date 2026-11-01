@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# A proposal stops short of 10KB of messages, though it always offers one:
+# two of 6000 bytes go one at a time.
+@queued P Q9TEST Q2BBS Q1TEST 1_Q1BBS 6000
+@queued P Q9TEST Q2BBS Q1TEST 2_Q1BBS 6000
+@answering
+> FF
+< FB P Q9TEST Q2BBS Q1TEST 1_Q1BBS 6001
+< F> C5
+> FS -
+> FF
+< FB P Q9TEST Q2BBS Q1TEST 2_Q1BBS 6001
+< F> C4
+> FS -
+> FF
+< FQ
+< *** disconnected
+@check accepted=0 forwarded=0 refused=2 pending=0

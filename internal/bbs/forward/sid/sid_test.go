@@ -78,8 +78,13 @@ func TestNegotiate(t *testing.T) {
 	var withBIDs, _ = Parse("[FBB-7.0-ABFHM$]")
 	var without, _ = Parse("[OLD-1.0-H]")
 
-	assert.Equal(t, Mode{BIDs: true}, Negotiate(Ours(0, 0), withBIDs))
-	assert.Equal(t, Mode{BIDs: false}, Negotiate(Ours(0, 0), without))
+	assert.Equal(t, Mode{BIDs: true, FBB: false}, Negotiate(Ours(0, 0), withBIDs), "this BBS doesn't claim F yet")
+	assert.Equal(t, Mode{BIDs: false, FBB: false}, Negotiate(Ours(0, 0), without))
+
+	var fbbToo = SID{Name: "SAMBBS", Version: "0.0", Flags: "FH$"}
+
+	assert.Equal(t, Mode{BIDs: true, FBB: true}, Negotiate(fbbToo, withBIDs))
+	assert.Equal(t, Mode{BIDs: false, FBB: false}, Negotiate(fbbToo, without))
 }
 
 func FuzzParse(f *testing.F) {

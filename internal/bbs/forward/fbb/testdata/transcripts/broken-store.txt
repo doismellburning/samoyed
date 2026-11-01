@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# A message that can't be stored isn't acknowledged - taking the turn would
+# say it had been - so the session ends, leaving it queued at the partner.
+@answering
+> FB P Q2TEST Q1BBS Q1TEST 40_Q2BBS 7
+> F> 29
+< FS +
+> Hello
+@broken
+> Hi.^Z
+< *** Error: a message couldn't be stored
+< *** disconnected

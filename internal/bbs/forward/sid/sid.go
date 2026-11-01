@@ -30,8 +30,7 @@ const (
 	// such as Q1BBS.#77.GBR.EURO.
 	FlagHierarchical = 'H'
 
-	// FlagFBB says the BBS can forward in FBB's batched protocol.  This
-	// one doesn't yet, so doesn't say so.
+	// FlagFBB says the BBS can forward in FBB's batched protocol.
 	FlagFBB = 'F'
 )
 
@@ -88,9 +87,16 @@ type Mode struct {
 	// BIDs says both use $BIDs, so a message is offered with its own and
 	// refused if the other side has had it.
 	BIDs bool
+
+	// FBB says both forward in FBB's batched protocol, so they do, rather
+	// than in plain MBL/RLI style.
+	FBB bool
 }
 
 // Negotiate is what ours and theirs agree to do: whatever both can.
 func Negotiate(ours, theirs SID) Mode {
-	return Mode{BIDs: ours.Has(FlagBID) && theirs.Has(FlagBID)}
+	return Mode{
+		BIDs: ours.Has(FlagBID) && theirs.Has(FlagBID),
+		FBB:  ours.Has(FlagFBB) && theirs.Has(FlagFBB),
+	}
 }

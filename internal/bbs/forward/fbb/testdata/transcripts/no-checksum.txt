@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# A proposal may leave its checksum out.
+@answering
+> FB P Q2TEST Q1BBS Q1TEST 40_Q2BBS 7
+> F>
+< FS +
+> Hello
+> Hi.^Z
+< FF
+@check accepted=1 forwarded=0 refused=0 pending=0
