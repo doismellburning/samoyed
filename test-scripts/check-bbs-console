@@ -14,8 +14,9 @@ goto_tmpdir
 # there and the killed one gone.
 
 cat > samoyed-bbs.yaml << EOF
-call: Q1BBS
-store: $PWD/bbs.db
+bbs:
+  call: Q1BBS
+  store: $PWD/bbs.db
 EOF
 
 "$BBS" -c samoyed-bbs.yaml --config-check

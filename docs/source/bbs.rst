@@ -28,12 +28,14 @@ so it can be tried, and its messages looked after, without a radio.
 Running it
 ----------
 
-Write a configuration file, ``samoyed-bbs.yaml`` by default:
+Write a configuration file, ``samoyed-bbs.yaml`` by default,
+with the BBS's settings under a top-level ``bbs`` key:
 
 .. code:: yaml
 
-    call: Q1BBS
-    store: /var/lib/samoyed-bbs/bbs.db
+    bbs:
+      call: Q1BBS
+      store: /var/lib/samoyed-bbs/bbs.db
 
 Check it, then start a session as yourself:
 
@@ -66,10 +68,11 @@ and serves each station that connects to that callsign:
 
 .. code:: yaml
 
-    call: Q1BBS
-    store: /var/lib/samoyed-bbs/bbs.db
-    agw:
-      addr: localhost:8000
+    bbs:
+      call: Q1BBS
+      store: /var/lib/samoyed-bbs/bbs.db
+      agw:
+        addr: localhost:8000
 
 .. code::
 
@@ -82,10 +85,11 @@ so that the password itself isn't in the BBS's file:
 
 .. code:: yaml
 
-    agw:
-      addr: localhost:8000
-      user: Q1BBS
-      passwordEnv: BBS_AGW_PASSWORD
+    bbs:
+      agw:
+        addr: localhost:8000
+        user: Q1BBS
+        passwordEnv: BBS_AGW_PASSWORD
 
 The BBS waits for the AGW server if it isn't up yet,
 and attaches again if it goes away and comes back.
@@ -96,8 +100,41 @@ Stations connect to the BBS's own callsign.
 A node on the same ``samoyed-direwolf`` can't connect a user to the BBS on the same channel without transmitting:
 a callsign registered over AGW only takes connections arriving from the radio.
 
+Sharing a file with samoyed-direwolf
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The BBS and ``samoyed-direwolf`` can share one :doc:`YAML configuration file <yaml-config>`,
+each reading its own top-level key and leaving the other's alone:
+``samoyed`` for ``samoyed-direwolf``, and ``bbs`` for the BBS.
+Any other top-level key is refused by both.
+
+.. code:: yaml
+
+    samoyed:
+      audioDevices:
+        - input: default
+      channels:
+        - {channel: 0, mycall: Q1TEST}
+      agwPort: 8000
+
+    bbs:
+      call: Q1BBS
+      store: /var/lib/samoyed-bbs/bbs.db
+      agw:
+        addr: localhost:8000
+
+.. code::
+
+    $ samoyed-direwolf -c samoyed.yaml
+    $ samoyed-bbs -c samoyed.yaml
+
 Configuration
 -------------
+
+Every setting goes under a top-level ``bbs`` key,
+and problems with them are named by where they are under it, as in ``bbs.call``.
+A file with settings outside it, other than ``samoyed-direwolf``'s ``samoyed`` key, is refused.
+These are the keys under ``bbs``:
 
 ``call``
     The BBS's callsign, with an optional SSID from 0 to 15.
@@ -314,16 +351,17 @@ or to a BBS already in its ``R:`` lines.
 
 .. code:: yaml
 
-    call: Q1BBS
-    hroute: "#77.GBR.EURO"
-    store: /var/lib/samoyed-bbs/bbs.db
-    partners:
-      - call: Q2BBS
-        covers: ["#77.GBR.EURO"]
-        floods: ["#77", GBR]
-      - call: Q3BBS
-        covers: ["*"]
-        floods: ["*"]
+    bbs:
+      call: Q1BBS
+      hroute: "#77.GBR.EURO"
+      store: /var/lib/samoyed-bbs/bbs.db
+      partners:
+        - call: Q2BBS
+          covers: ["#77.GBR.EURO"]
+          floods: ["#77", GBR]
+        - call: Q3BBS
+          covers: ["*"]
+          floods: ["*"]
 
 Forwarding
 ----------
@@ -423,17 +461,18 @@ whose ``BBS`` command connects on to it.
 
 .. code:: yaml
 
-    partners:
-      - call: Q3BPQ
-        covers: ["*"]
-        floods: ["*"]
-        connect:
-          port: 0
-          to: Q3NOD
-          script:
-            - send: C Q3BPQ
-            - expect: Connected to
-          every: 30m
+    bbs:
+      partners:
+        - call: Q3BPQ
+          covers: ["*"]
+          floods: ["*"]
+          connect:
+            port: 0
+            to: Q3NOD
+            script:
+              - send: C Q3BPQ
+              - expect: Connected to
+            every: 30m
 
 A call that fails - no answer, a script step that times out,
 or the partner hanging up before the exchange is over -

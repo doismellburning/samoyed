@@ -37,7 +37,7 @@ type bbs struct {
 func newBBS(t *testing.T, yaml string) bbs {
 	t.Helper()
 
-	var cfg, cfgErr = config.Parse([]byte(yaml + "store: " + filepath.Join(t.TempDir(), "bbs.db") + "\n"))
+	var cfg, cfgErr = config.Parse(underBBS(yaml + "store: " + filepath.Join(t.TempDir(), "bbs.db") + "\n"))
 	require.NoError(t, cfgErr)
 
 	var store, storeErr = sqlite.Open(t.Context(), cfg.Store)

@@ -199,31 +199,34 @@ EOF
 done
 
 cat > samoyed-bbs.yaml << EOF
-call: Q2BBS
-fbb: true
-store: $PWD/bbs.db
-agw:
-  addr: 127.0.0.1:$agw_b
-  paclen: 256
-partners:
-  - call: Q3BBS
-    covers: ["*"]
+bbs:
+  call: Q2BBS
+  fbb: true
+  store: $PWD/bbs.db
+  agw:
+    addr: 127.0.0.1:$agw_b
+    paclen: 256
+  partners:
+    - call: Q3BBS
+      covers: ["*"]
 EOF
 
 # Q3BBS, on A, calls Q2BBS whenever it has mail for it, both forwarding in
-# FBB's protocol.
-cat > samoyed-bbs3.yaml << EOF
-call: Q3BBS
-fbb: true
-store: $PWD/bbs3.db
-agw:
-  addr: 127.0.0.1:$agw_a
-  paclen: 256
-partners:
-  - call: Q2BBS
-    covers: ["*"]
-    connect:
-      port: 0
+# FBB's protocol.  Its settings share A's TNC's file, each program reading
+# its own part of it.
+cat >> direwolf-a.yaml << EOF
+bbs:
+  call: Q3BBS
+  fbb: true
+  store: $PWD/bbs3.db
+  agw:
+    addr: 127.0.0.1:$agw_a
+    paclen: 256
+  partners:
+    - call: Q2BBS
+      covers: ["*"]
+      connect:
+        port: 0
 EOF
 
 # --- start the TNCs and the BBS --------------------------------------------
@@ -269,9 +272,9 @@ fi
 # --- a partner calls in -----------------------------------------------------
 
 printf 'SP Q1TEST@Q2BBS\nCalled in\nForwarded over the air.\n/EX\nB\n' |
-	"$BBS" -c samoyed-bbs3.yaml --console Q9TEST > bbs3-console.log 2>&1
+	"$BBS" -c direwolf-a.yaml --console Q9TEST > bbs3-console.log 2>&1
 
-"$BBS" -c samoyed-bbs3.yaml -v > bbs3.log 2>&1 &
+"$BBS" -c direwolf-a.yaml -v > bbs3.log 2>&1 &
 pids+=("$!")
 
 wait_for_log_line bbs3.log "Calling partner"

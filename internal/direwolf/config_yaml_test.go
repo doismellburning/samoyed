@@ -919,6 +919,23 @@ legacy: |
 }
 
 //nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
+func Test_config_yaml_shared_file(t *testing.T) {
+	t.Run("samoyed-bbs's settings are left to it", func(t *testing.T) {
+		var c = parseConfigNamed(t, "samoyed*.yaml",
+			underSamoyed(withDefaultAudioDevice("channels:\n  - {channel: 0, mycall: Q1TEST}\n"))+"bbs:\n  call: Q1BBS\n  anything: [it, likes]\n")
+		assert.Zero(t, c.errors, c.output)
+		assert.False(t, c.fatal)
+		assert.Equal(t, "Q1TEST", c.audio.mycall[0])
+	})
+
+	t.Run("other settings beside the samoyed key are refused", func(t *testing.T) {
+		var c = parseConfigNamed(t, "samoyed*.yaml", "samoyed:\n  channels:\n    - {channel: 0, mycall: Q1TEST}\nbsb:\n  call: Q1BBS\n")
+		assert.True(t, c.fatal)
+		assert.Contains(t, c.output, "bsb")
+	})
+}
+
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_yaml_node_map(t *testing.T) {
 	t.Run("the node is reported to the node map when asked", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "node:\n  address: q1test-7\n  alias: samnod\n  map: {}\n")
