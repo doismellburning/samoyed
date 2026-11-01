@@ -14,7 +14,7 @@ BBS
     and to its message database - without notice,
     and don't rely on it for mail that matters.
     In particular, it forwards mail only with partners that connect to it, and not yet in FBB's batched protocol,
-    and neither its forwarding nor the ``R:`` lines it writes have been checked against other BBSes' (see below).
+    and its forwarding has been tried against LinBPQ alone, not yet FBB or XRouter (see below).
     It says so when it starts, in ``--help``, and in the banner it greets stations with.
 
 ``samoyed-bbs`` is a packet bulletin board:
@@ -234,8 +234,13 @@ saying when it took the message and which BBS it is:
     R:261101/0905Z @:Q1BBS.#77.GBR.EURO
 
 That is the form this BBS writes.
-It hasn't yet been checked against what FBB, BPQ and XRouter write and expect,
-so it may change;
+LinBPQ reads it,
+taking a message's date from it,
+and writes its own as ``R:261101/0905Z 12@Q3BPQ.#33.GBR.EURO LinBPQ6.0.26``,
+the message's number there before the ``@``,
+which this BBS reads in turn.
+FBB's and XRouter's haven't been checked yet,
+so the form may change;
 it reads other BBSes' lines leniently, needing only the date, the time and the BBS's callsign.
 
 Routing
@@ -297,19 +302,28 @@ It offers each message with a line such as::
     SP Q1TEST @ Q1BBS.#77.GBR.EURO < Q2TEST $123_Q2BBS
 
 which this BBS answers ``OK``, or ``NO`` for one whose ID it has seen before or that it can't make sense of.
-An accepted message follows as its title, its body and ``/EX``,
-and this BBS's prompt says it has been taken.
-``F>`` hands this BBS the turn,
+An accepted message follows as its title, its body and ``/EX``.
+After each message, and each ``NO``,
+the side receiving says it is ready for the next:
+with ``F>`` if it made the connection,
+or with its prompt if it was called.
+A partner with nothing more to send hands this BBS the turn with ``F>``,
 and it offers whatever is queued for the partner the same way,
-marking each forwarded once the partner prompts after it, or refused if the partner says ``NO``.
-It ends with ``*** DONE``.
+marking each forwarded once the partner says it is ready again, or refused if the partner says ``NO``.
+With nothing more of its own, it ends with ``*** DONE``.
 
 A message taken from a partner gets this BBS's ``R:`` line on top of the others,
 and is routed on like any other,
 though never back to the partner it came from.
 
-These lines are the exchange as FBB's documentation is recalled to describe it,
-and haven't yet been checked against what FBB, BPQ and XRouter actually send,
-so they may change.
+That is the exchange as seen forwarding with LinBPQ both ways.
+FBB and XRouter haven't been tried yet,
+so it may change.
 Calling partners to forward with them,
 and FBB's batched protocol, are still to come.
+
+References
+----------
+
+- LinBPQ 6.0.26.1, as forwarded with:
+  https://www.cantab.net/users/john.wiseman/Downloads/Beta/

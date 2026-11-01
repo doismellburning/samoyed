@@ -6,8 +6,10 @@
 // what two BBSes that have swapped them agree to do.
 //
 // The flags' meanings here are as FBB's documentation gives them, as best
-// this package's author recalls it: they are to be checked against captures
-// from FBB, BPQ and XRouter (#1152).
+// this package's author recalls it.  LinBPQ 6.0.26.1 announces
+// [BPQ-6.0.26.1-B2FWIHJM$] to users, and sent [BPQ-6.0.26.1-IHJM$] when
+// forwarding to this BBS with its batched protocols turned off for it; FBB
+// and XRouter are still to be checked (#1152).
 package sid
 
 import (
