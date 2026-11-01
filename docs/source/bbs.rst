@@ -250,6 +250,14 @@ These are the keys under ``bbs``:
             How long each ``expect`` waits.
             Left out, two minutes.
 
+``web``
+    Optionally, where to serve the read-only web interface, as described under Web interface below.
+    It needs an ``agw`` block, as it is served alongside it.
+    It has:
+
+    ``addr``
+        The ``host:port`` to listen on, such as ``127.0.0.1:8081``.
+
 ``--config-check`` reports every problem in the file at once,
 and its exit status is 1 if there are any,
 so it can go in a systemd unit's ``ExecStartPre``.
@@ -482,6 +490,46 @@ Each failure counts against the mail waiting for that partner,
 and mail that has waited through five is held for the sysop:
 personal mail and traffic outright,
 and a bulletin only for that partner, since it is here to be read too.
+
+Web interface
+-------------
+
+Given a ``web`` block, the BBS serves a web interface for the sysop,
+to see what it holds without connecting to it:
+
+.. code:: yaml
+
+    bbs:
+      call: Q1BBS
+      store: /var/lib/samoyed-bbs/bbs.db
+      agw:
+        addr: localhost:8000
+      web:
+        addr: 127.0.0.1:8081
+
+Then browse to ``http://127.0.0.1:8081/``.
+It has three pages:
+an overview of the BBS's settings, its messages counted by type and status, and how forwarding stands with each partner;
+the messages, which can be narrowed by type, status, sender and addressee,
+each of which opens to show its text, its ``R:`` lines,
+and where it is in each partner's queue;
+and the partners, as configured, with what is waiting for, gone to, refused by and held for each.
+A partner that mail was queued for and has since left the configuration is shown too.
+
+It is read-only:
+nothing on it sends, kills or releases a message,
+and reading a message there doesn't mark it read.
+The page asks the BBS for JSON under ``/api/``,
+which can be read directly too:
+``/api/info``, ``/api/messages``, ``/api/messages/n`` and ``/api/partners``.
+
+.. warning::
+
+    The web interface shows every message, personal mail and killed messages included,
+    and asks nobody to log in.
+    Keep it on a loopback address, as above,
+    and to reach it from elsewhere, put a reverse proxy that does ask in front of it,
+    or use an SSH tunnel.
 
 References
 ----------

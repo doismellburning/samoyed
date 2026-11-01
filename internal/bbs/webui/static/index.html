@@ -1,0 +1,97 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: 2026 The Samoyed Authors
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Samoyed BBS</title>
+<link rel="icon" type="image/png" href="static/favicon.png">
+<link rel="stylesheet" href="static/app.css">
+<script src="static/app.js" defer></script>
+</head>
+<body>
+<header>
+  <h1><img src="static/favicon.png" alt="" width="32" height="32"><span id="bbs-call">Samoyed BBS</span></h1>
+  <nav>
+    <a href="#/" data-view="overview">Overview</a>
+    <a href="#/messages" data-view="messages">Messages</a>
+    <a href="#/partners" data-view="partners">Partners</a>
+  </nav>
+  <span id="bbs-info" class="muted"></span>
+  <span class="badge">Read-only</span>
+</header>
+
+<main>
+  <p id="error" class="error" hidden></p>
+
+  <section id="view-overview" hidden>
+    <dl id="settings" class="settings"></dl>
+    <h2>Messages</h2>
+    <table id="counts" class="counts">
+      <thead><tr><th>Type</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <h2>Forwarding</h2>
+    <div id="overview-partners"></div>
+  </section>
+
+  <section id="view-messages" hidden>
+    <form id="filters" class="filters">
+      <label>Type
+        <select name="type">
+          <option value="">Any</option>
+          <option value="P">Personal</option>
+          <option value="B">Bulletin</option>
+          <option value="T">Traffic</option>
+        </select>
+      </label>
+      <label>Status
+        <select name="status">
+          <option value="">Any but killed</option>
+          <option value="N">New</option>
+          <option value="Y">Read</option>
+          <option value="F">Forwarded</option>
+          <option value="H">Held</option>
+          <option value="K">Killed</option>
+          <option value="N,Y,F,H,K">Everything</option>
+        </select>
+      </label>
+      <label>From <input name="from" size="9" autocomplete="off"></label>
+      <label>To <input name="to" size="6" autocomplete="off"></label>
+      <button type="submit">Filter</button>
+    </form>
+    <table id="messages" class="messages">
+      <thead>
+        <tr><th class="num">#</th><th>Type</th><th>Status</th><th>From</th><th>To</th><th>Title</th><th class="num">Size</th><th>Date</th><th>ID</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p id="messages-empty" class="empty" hidden>No messages.</p>
+  </section>
+
+  <section id="view-message" hidden>
+    <p><a href="#/messages">&larr; Messages</a></p>
+    <h2 id="message-title"></h2>
+    <dl id="message-headers" class="settings"></dl>
+    <details id="message-rlines">
+      <summary>R: lines</summary>
+      <pre></pre>
+    </details>
+    <pre id="message-text" class="message-text"></pre>
+    <h3>Forwarding</h3>
+    <table id="message-forwarding">
+      <thead><tr><th>Partner</th><th>State</th><th class="num">Attempts</th><th>Last tried</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p id="message-forwarding-empty" class="empty" hidden>Not queued for any partner.</p>
+  </section>
+
+  <section id="view-partners" hidden>
+    <div id="partners"></div>
+  </section>
+</main>
+</body>
+</html>
