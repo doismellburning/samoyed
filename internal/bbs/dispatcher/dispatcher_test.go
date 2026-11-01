@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/bbs/action"
+	"github.com/doismellburning/samoyed/internal/bbs/forward/sid"
 	"github.com/doismellburning/samoyed/internal/bbs/lines"
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
 	"github.com/doismellburning/samoyed/internal/bbs/transport/memt"
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -121,7 +123,67 @@ func TestASIDIsTurnedAway(t *testing.T) {
 	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
 
 	say(t, station, "[FBB-7.0-ABFHM$]")
-	expect(t, r, "This BBS doesn't forward mail yet.  73.")
+	expect(t, r, "Q2TEST isn't a forwarding partner of this BBS.  73.")
+
+	require.NoError(t, result(t, done))
+}
+
+// forwarding is a forwarding machine that says what SID the partner opened
+// with, and hangs up when it says *** DONE.
+type forwarding struct{ theirs sid.SID }
+
+func (f *forwarding) Start() []action.Action {
+	return []action.Action{action.Output{Lines: []string{"forwarding with " + f.theirs.Name}}}
+}
+
+func (f *forwarding) Line(_ context.Context, line string) []action.Action {
+	if line == "*** DONE" {
+		return []action.Action{action.Disconnect{}}
+	}
+
+	return []action.Action{action.Output{Lines: []string{"forwarding got " + line}}}
+}
+
+func TestAPartnersSIDStartsForwarding(t *testing.T) {
+	t.Parallel()
+
+	var cfg = testConfig()
+	var asked []string
+
+	cfg.Forwarder = func(peer transport.Peer, theirs sid.SID) maybe.Maybe[Machine] {
+		asked = append(asked, peer.Call)
+
+		return maybe.Just[Machine](&forwarding{theirs: theirs})
+	}
+
+	var station, r, done = start(t, cfg)
+
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
+
+	say(t, station, " [FBB-7.0-ABFHM$] ")
+	expect(t, r, "forwarding with FBB")
+
+	say(t, station, "F>")
+	expect(t, r, "forwarding got F>")
+
+	say(t, station, "*** DONE")
+	require.NoError(t, result(t, done))
+	assert.Equal(t, []string{"Q2TEST"}, asked)
+}
+
+func TestAStrangersSIDIsTurnedAway(t *testing.T) {
+	t.Parallel()
+
+	var cfg = testConfig()
+
+	cfg.Forwarder = func(transport.Peer, sid.SID) maybe.Maybe[Machine] { return maybe.Nothing[Machine]() }
+
+	var station, r, done = start(t, cfg)
+
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
+
+	say(t, station, "[FBB-7.0-ABFHM$]")
+	expect(t, r, "Q2TEST isn't a forwarding partner of this BBS.  73.")
 
 	require.NoError(t, result(t, done))
 }

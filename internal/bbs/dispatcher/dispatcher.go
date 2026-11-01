@@ -3,25 +3,29 @@
 
 // Package dispatcher runs a session: it greets the station, sends the BBS's
 // SID, and then passes each line to the user shell and its answers back.  A
-// station whose first line is a SID is another BBS come to forward mail,
-// which this BBS doesn't do yet, so it is turned away.
+// station whose first line is a SID is another BBS come to forward mail: a
+// partner's session is handed to its forwarding machine, and anyone else is
+// turned away.
 package dispatcher
 
 import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/bbs/action"
 	"github.com/doismellburning/samoyed/internal/bbs/forward/sid"
 	"github.com/doismellburning/samoyed/internal/bbs/lines"
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
 )
 
-// machine is a user shell, as a session drives it.
-type machine interface {
+// Machine is what a session drives: the user shell, or a forwarding
+// exchange.
+type Machine interface {
 	Start() []action.Action
 	Line(ctx context.Context, line string) []action.Action
 }
@@ -41,21 +45,26 @@ type Config struct {
 
 	// MaxLineLen is the longest line a station may send.
 	MaxLineLen int
+
+	// Forwarder, given the station and the SID it opened with, is the
+	// machine to forward mail with it, if it is a partner.  Left nil, no
+	// station is.
+	Forwarder func(peer transport.Peer, theirs sid.SID) maybe.Maybe[Machine]
 }
 
 // Dispatcher runs sessions.
 type Dispatcher struct {
 	cfg        Config
-	newMachine func(peer transport.Peer) machine
+	newMachine func(peer transport.Peer) Machine
 }
 
 // New makes a Dispatcher that runs each session with the shell newMachine
 // makes for its peer.
-func New[M machine](cfg Config, newMachine func(peer transport.Peer) M) *Dispatcher {
+func New[M Machine](cfg Config, newMachine func(peer transport.Peer) M) *Dispatcher {
 	var d = new(Dispatcher)
 
 	d.cfg = cfg
-	d.newMachine = func(peer transport.Peer) machine { return newMachine(peer) }
+	d.newMachine = func(peer transport.Peer) Machine { return newMachine(peer) }
 
 	return d
 }
@@ -100,8 +109,22 @@ func (d *Dispatcher) serve(ctx context.Context, s transport.Session, peer transp
 			return d.ended(ctx, s, readErr)
 		}
 
-		if first && sid.IsSID(line) {
-			return lines.Write(s, "This BBS doesn't forward mail yet.  73.")
+		if first && sid.IsSID(strings.TrimSpace(line)) {
+			var forwarder, ok = d.forwarder(peer, strings.TrimSpace(line)).Get()
+			if !ok {
+				return lines.Write(s, peer.Call+" isn't a forwarding partner of this BBS.  73.")
+			}
+
+			logrus.WithField("station", peer.Call).Info("Forwarding mail")
+
+			m = forwarder
+
+			var done, err = perform(s, m.Start())
+			if err != nil || done {
+				return err
+			}
+
+			continue
 		}
 
 		var done, err = perform(s, m.Line(ctx, line))
@@ -109,6 +132,17 @@ func (d *Dispatcher) serve(ctx context.Context, s transport.Session, peer transp
 			return err
 		}
 	}
+}
+
+// forwarder is the machine to forward mail with peer, which opened with
+// line, its SID, if it is a partner.
+func (d *Dispatcher) forwarder(peer transport.Peer, line string) maybe.Maybe[Machine] {
+	var theirs, err = sid.Parse(line)
+	if err != nil || d.cfg.Forwarder == nil {
+		return maybe.Nothing[Machine]()
+	}
+
+	return d.cfg.Forwarder(peer, theirs)
 }
 
 // readLine reads the station's next line, giving up after IdleTimeout.

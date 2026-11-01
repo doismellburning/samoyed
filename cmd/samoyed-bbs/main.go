@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -19,6 +20,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/agwclient"
 	"github.com/doismellburning/samoyed/internal/bbs/config"
 	"github.com/doismellburning/samoyed/internal/bbs/dispatcher"
+	"github.com/doismellburning/samoyed/internal/bbs/forward/mbl"
 	"github.com/doismellburning/samoyed/internal/bbs/forward/sid"
 	"github.com/doismellburning/samoyed/internal/bbs/lines"
 	"github.com/doismellburning/samoyed/internal/bbs/mail"
@@ -194,32 +196,72 @@ func acceptSessions(ctx context.Context, listener *agwt.Listener, d *dispatcher.
 	}
 }
 
-// routedStore is the message store with routing in front of it: a message a
-// user sends is routed as it is taken, and queued for whichever partners it
-// is to go on to, or held if there are none.
+// routedStore is the message store with routing in front of it: a message
+// taken, from a user or a partner, is routed as it is stored, and queued for
+// whichever partners it is to go on to, or held if there are none.
 type routedStore struct {
 	*sqlite.Store
 
+	call     string
 	self     routing.Self
 	partners []routing.Partner
 }
 
-// Accept routes m and stores it.
+// Accept routes m, which a user sent, and stores it.
 func (r routedStore) Accept(ctx context.Context, m mail.NewMessage, bbsCall string) (mail.Message, error) {
 	return r.AcceptRouted(ctx, m, bbsCall, routing.Route(m, maybe.Nothing[string](), r.self, r.partners))
 }
 
-// newDispatcher makes the dispatcher every session is run by, each with a
-// shell of its own over store, routing what users send.
+// AcceptForwarded routes m, which the partner from sent, and stores it.  It is
+// never routed back to from.
+func (r routedStore) AcceptForwarded(ctx context.Context, m mail.NewMessage, from string) (mail.Message, error) {
+	return r.AcceptRouted(ctx, m, r.call, routing.Route(m, maybe.Just(from), r.self, r.partners))
+}
+
+// isPartner says whether call, with or without an SSID, is a partner's.
+func (r routedStore) isPartner(call string) bool {
+	var base, _, _ = strings.Cut(strings.ToUpper(call), "-")
+
+	return slices.ContainsFunc(r.partners, func(p routing.Partner) bool { return p.Call == base })
+}
+
+func newMailbox(cfg config.Config, store *sqlite.Store) routedStore {
+	return routedStore{Store: store, call: cfg.Call, self: cfg.RoutingSelf(), partners: cfg.RoutingPartners()}
+}
+
+// forwardConfig is how this BBS forwards mail with its partners.  Its prompt
+// ends in >, which is how the other BBS tells it is ready.
+func forwardConfig(cfg config.Config) mbl.Config {
+	var prompt = cfg.Prompt
+	if !strings.HasSuffix(prompt, ">") {
+		prompt += ">"
+	}
+
+	return mbl.Config{Call: cfg.Call, HRoute: cfg.HRouteMaybe(), Prompt: prompt, SID: sid.Ours(version.Major, version.Minor), Now: nil}
+}
+
+// newDispatcher makes the dispatcher every session is run by: a user gets a
+// shell of their own over store, routing what they send, and a partner that
+// opens with its SID an exchange of mail.
 func newDispatcher(cfg config.Config, store *sqlite.Store) *dispatcher.Dispatcher {
-	var mailbox = routedStore{Store: store, self: cfg.RoutingSelf(), partners: cfg.RoutingPartners()}
+	var mailbox = newMailbox(cfg, store)
+	var fcfg = forwardConfig(cfg)
 
 	var dcfg = new(dispatcher.Config)
 
 	dcfg.Banner = cfg.BannerLines()
-	dcfg.SID = sid.Ours(version.Major, version.Minor).String()
+	dcfg.SID = fcfg.SID.String()
 	dcfg.IdleTimeout = cfg.IdleTimeout
 	dcfg.MaxLineLen = lines.DefaultMaxLen
+
+	// The console is the sysop, not a BBS.
+	dcfg.Forwarder = func(peer transport.Peer, theirs sid.SID) maybe.Maybe[dispatcher.Machine] {
+		if peer.Kind == transport.Console || !mailbox.isPartner(peer.Call) {
+			return maybe.Nothing[dispatcher.Machine]()
+		}
+
+		return maybe.Just[dispatcher.Machine](mbl.NewAnswering(peer.Call, theirs, mailbox, fcfg))
+	}
 
 	var scfg = shell.Config{Call: cfg.Call, Prompt: cfg.Prompt, HRoute: cfg.HRouteMaybe(), Now: nil}
 

@@ -13,8 +13,8 @@ BBS
     Expect missing features, and changes - to its configuration, to what it sends other BBSes,
     and to its message database - without notice,
     and don't rely on it for mail that matters.
-    In particular, it can't yet forward mail to other BBSes,
-    and the ``R:`` lines it writes haven't been checked against other BBSes' (see below).
+    In particular, it forwards mail only with partners that connect to it, and not yet in FBB's batched protocol,
+    and neither its forwarding nor the ``R:`` lines it writes have been checked against other BBSes' (see below).
     It says so when it starts, in ``--help``, and in the banner it greets stations with.
 
 ``samoyed-bbs`` is a packet bulletin board:
@@ -120,6 +120,8 @@ Configuration
 ``prompt``
     What a user is prompted with for each command.
     Left out, ``de`` and the BBS's callsign, as in ``de Q1BBS>``.
+    A forwarding partner takes a line ending in ``>`` as the prompt,
+    so one that doesn't end in ``>`` gets one added for partners.
 
 ``idleTimeout``
     How long a station may say nothing before it is disconnected, such as ``5m``.
@@ -239,10 +241,9 @@ it reads other BBSes' lines leniently, needing only the date, the time and the B
 Routing
 -------
 
-Each message sent at the BBS is routed as it is taken,
-and queued for the partners it is to go on to.
-Sending it on is still to come:
-for now, it waits in the queue.
+Each message sent at the BBS, by a user or a partner, is routed as it is taken,
+and queued for the partners it is to go on to,
+until it is forwarded (see below).
 
 Personal mail and traffic for a user here,
 with no ``@``, or with an ``@`` naming this BBS,
@@ -276,3 +277,39 @@ or to a BBS already in its ``R:`` lines.
       - call: Q3BBS
         covers: ["*"]
         floods: ["*"]
+
+Forwarding
+----------
+
+A partner forwards mail by connecting to the BBS's callsign, as a user would,
+and sending its system ID, such as ``[FBB-7.0-ABFHM$]``, as its first line.
+A station that isn't one of the ``partners`` is turned away.
+As with users, the callsign is only the station's word for who it is.
+
+The two then forward one message at a time, in the plain MBL/RLI style
+that BBSes without FBB's batched protocol use,
+and that those with it fall back to with a BBS that doesn't claim it:
+this BBS's system ID, ``[SAMBBS-0.0-H$]``, says it understands hierarchical addresses (``H``) and message IDs (``$``),
+but not FBB's protocol (``F``).
+The partner sends first.
+It offers each message with a line such as::
+
+    SP Q1TEST @ Q1BBS.#77.GBR.EURO < Q2TEST $123_Q2BBS
+
+which this BBS answers ``OK``, or ``NO`` for one whose ID it has seen before or that it can't make sense of.
+An accepted message follows as its title, its body and ``/EX``,
+and this BBS's prompt says it has been taken.
+``F>`` hands this BBS the turn,
+and it offers whatever is queued for the partner the same way,
+marking each forwarded once the partner prompts after it, or refused if the partner says ``NO``.
+It ends with ``*** DONE``.
+
+A message taken from a partner gets this BBS's ``R:`` line on top of the others,
+and is routed on like any other,
+though never back to the partner it came from.
+
+These lines are the exchange as FBB's documentation is recalled to describe it,
+and haven't yet been checked against what FBB, BPQ and XRouter actually send,
+so they may change.
+Calling partners to forward with them,
+and FBB's batched protocol, are still to come.
