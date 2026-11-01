@@ -464,6 +464,83 @@ func (s *Store) QueueFor(ctx context.Context, partner string) ([]int, error) {
 	return queue, rows.Err()
 }
 
+// RecordFailedAttempt records that partner couldn't be forwarded to, by
+// counting an attempt against each message waiting for it.  A message that
+// has been tried maxAttempts times stops waiting, and is held for the sysop:
+// personal mail and traffic as a whole, since nothing else will deliver it;
+// a bulletin only for that partner, as it is here to be read too.  It
+// returns the numbers of the messages held.
+func (s *Store) RecordFailedAttempt(ctx context.Context, partner string, maxAttempts int) ([]int, error) {
+	var tx, txErr = s.db.BeginTx(ctx, nil)
+	if txErr != nil {
+		return nil, fmt.Errorf("recording a failed attempt: %w", txErr)
+	}
+
+	defer func() { _ = tx.Rollback() }()
+
+	var call = strings.ToUpper(partner)
+
+	var _, countErr = tx.ExecContext(ctx,
+		"UPDATE forward_queue SET attempts = attempts + 1, last_try = ? WHERE partner = ? AND state = 'pending'",
+		s.now().Unix(), call)
+	if countErr != nil {
+		return nil, fmt.Errorf("recording a failed attempt: %w", countErr)
+	}
+
+	var held, heldErr = triedOut(ctx, tx, call, maxAttempts)
+	if heldErr != nil {
+		return nil, fmt.Errorf("recording a failed attempt: %w", heldErr)
+	}
+
+	for _, n := range held {
+		var _, holdErr = tx.ExecContext(ctx, "UPDATE forward_queue SET state = 'held' WHERE msg = ? AND partner = ?", n, call)
+		if holdErr != nil {
+			return nil, fmt.Errorf("holding message %d: %w", n, holdErr)
+		}
+
+		var _, statusErr = tx.ExecContext(ctx,
+			"UPDATE messages SET status = ? WHERE number = ? AND type != 'B' AND status != ?",
+			mail.Held.String(), n, mail.Killed.String())
+		if statusErr != nil {
+			return nil, fmt.Errorf("holding message %d: %w", n, statusErr)
+		}
+	}
+
+	var commitErr = tx.Commit()
+	if commitErr != nil {
+		return nil, fmt.Errorf("recording a failed attempt: %w", commitErr)
+	}
+
+	return held, nil
+}
+
+// triedOut is the messages waiting for partner that have been tried
+// maxAttempts times.
+func triedOut(ctx context.Context, tx *sql.Tx, partner string, maxAttempts int) ([]int, error) {
+	var rows, err = tx.QueryContext(ctx,
+		"SELECT msg FROM forward_queue WHERE partner = ? AND state = 'pending' AND attempts >= ? ORDER BY msg", partner, maxAttempts)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = rows.Close() }()
+
+	var msgs []int
+
+	for rows.Next() {
+		var n int
+
+		var scanErr = rows.Scan(&n)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+
+		msgs = append(msgs, n)
+	}
+
+	return msgs, rows.Err()
+}
+
 // MarkForwarded records that partner has taken message n.
 func (s *Store) MarkForwarded(ctx context.Context, n int, partner string) error {
 	return s.finishForward(ctx, n, partner, "forwarded")
