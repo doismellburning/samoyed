@@ -76,6 +76,16 @@ type Config struct {
 
 	// Partners are the BBSes this one forwards mail to.
 	Partners []Partner `yaml:"partners"`
+
+	// Web, if given, is where to serve the read-only web interface.
+	Web *Web `yaml:"web"`
+}
+
+// Web is the BBS's read-only web interface, for the sysop.  It shows every
+// message, personal ones included, and asks nobody to log in.
+type Web struct {
+	// Addr is the host:port to listen on, such as "127.0.0.1:8081".
+	Addr string `yaml:"addr"`
 }
 
 // Partner is a BBS this one forwards mail to, and what for.
@@ -326,7 +336,37 @@ func (c Config) problems(lookupEnv func(name string) (string, bool)) []error {
 	problems = append(problems, c.validatePartners()...)
 	problems = append(problems, c.validateConnects(lookupEnv)...)
 
+	if c.Web != nil {
+		problems = append(problems, c.validateWeb()...)
+	}
+
 	return problems
+}
+
+// validateWeb checks the web interface's settings.  It is served alongside
+// the AGW server, so there must be one.
+func (c Config) validateWeb() []error {
+	var problems []error
+
+	var _, _, addrErr = net.SplitHostPort(c.Web.Addr)
+	if addrErr != nil {
+		problems = append(problems, fmt.Errorf("web.addr: %q is not a host:port", c.Web.Addr))
+	}
+
+	if c.AGW == nil {
+		problems = append(problems, errors.New("web: the web interface is served alongside an agw block, and there isn't one"))
+	}
+
+	return problems
+}
+
+// WebAddr is where to serve the web interface, if anywhere.
+func (c Config) WebAddr() maybe.Maybe[string] {
+	if c.Web == nil {
+		return maybe.Nothing[string]()
+	}
+
+	return maybe.Just(c.Web.Addr)
 }
 
 // validateConnects checks how partners are called: over the AGW server, so

@@ -63,6 +63,7 @@ SPDX-License-Identifier = "BSD-2-Clause"
 path = [
 	"docs/source/_static/favicon.png",
 	"docs/source/_static/logo.png",
+	"internal/bbs/webui/static/favicon.png",
 	"internal/webui/static/favicon.png",
 ]
 precedence = "override"

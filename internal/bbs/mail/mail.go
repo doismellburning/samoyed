@@ -242,3 +242,49 @@ type ListQuery struct {
 	// killed messages are left out.
 	Statuses []Status
 }
+
+// ForwardState is where a message is in a partner's forwarding queue.
+type ForwardState string
+
+const (
+	// ForwardPending is waiting to go to the partner.
+	ForwardPending ForwardState = "pending"
+
+	// ForwardDone has been taken by the partner.
+	ForwardDone ForwardState = "forwarded"
+
+	// ForwardRefused was turned down by the partner, as one it had.
+	ForwardRefused ForwardState = "refused"
+
+	// ForwardHeld stopped waiting after the partner couldn't be reached,
+	// time after time, and is held for the sysop.
+	ForwardHeld ForwardState = "held"
+)
+
+// ForwardEntry is one message's place in one partner's forwarding queue.
+type ForwardEntry struct {
+	Msg      int
+	Partner  string
+	State    ForwardState
+	Attempts int
+
+	// LastTry is when it was last offered, or the partner last couldn't be
+	// reached, or Nothing if it hasn't been tried yet.
+	LastTry maybe.Maybe[time.Time]
+}
+
+// PartnerTotals is how forwarding to one partner stands: how many messages
+// are in each state, and when it was last tried.
+type PartnerTotals struct {
+	Partner string
+
+	// Pending leaves out killed messages, which won't be sent.
+	Pending   int
+	Forwarded int
+	Refused   int
+	Held      int
+
+	// LastTry is the latest try of any of the partner's messages, or
+	// Nothing if none has been tried.
+	LastTry maybe.Maybe[time.Time]
+}
