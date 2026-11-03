@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/demod"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -357,7 +358,7 @@ func multiModemImplRecFrame(t *testing.T, modemType modem_t, fbuf []byte) *ax25.
 	var audioConfig = new(RadioConfig)
 	audioConfig.achan[0].ModemType = modemType
 
-	var receiver = NewLayer2Receiver(audioConfig, [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(multiModemImplSink))
+	var receiver = NewLayer2Receiver(audioConfig, [MAX_RADIO_CHANS]*demod.Demodulator{}, 0, 0, new(multiModemImplSink))
 
 	var got *ax25.Packet
 

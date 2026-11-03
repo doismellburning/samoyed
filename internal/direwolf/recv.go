@@ -88,6 +88,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/dtmf"
 	"github.com/doismellburning/samoyed/internal/dwcore"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
 
@@ -315,4 +316,78 @@ func recv_process(ctx context.Context, q dataLinkSource, link *AX25Link, rh *rec
 			}
 		}
 	}
+}
+
+/*------------------------------------------------------------------
+ *
+ * Name:        demod_get_sample
+ *
+ * Purpose:     Get one audio sample from the specified sound input source.
+ *
+ * Inputs:	a	- Index for audio device.  0 = first.
+ *
+ * Returns:     -32768 .. 32767 for a valid audio sample.
+ *              256*256 for end of file or other error.
+ *
+ * Inputs:	a	- Audio device number.
+ *
+ *		bits_per_sample	- That device's, 8 or 16, so we know
+ *				  whether to read 1 or 2 bytes from audio stream.
+ *
+ *		src	- Where the sample data comes from.
+ *
+ * Description:	Grab 1 or two bytes depending on data source.
+ *
+ *		When processing stereo, the caller will call this
+ *		at twice the normal rate to obtain alternating left
+ *		and right samples.
+ *
+ *----------------------------------------------------------------*/
+
+const FSK_READ_ERR = (256 * 256)
+
+// A SampleSource is where the audio the demodulators work on comes from: one
+// byte of sample data at a time, or -1 when there is no more.
+//
+// AudioDevices is the one a running Samoyed uses; samoyed-atest reads a
+// .WAV file instead, and a test hands over bytes of its own.
+type SampleSource interface {
+	GetByte(adev int) int
+}
+
+func demod_get_sample(a int, bits_per_sample int, src SampleSource) int {
+	dwutil.Assert(bits_per_sample == 8 || bits_per_sample == 16)
+
+	// TODO KG Originally this was a C signed short with the comment "short to force sign extension" - forcing via int16 seems to do the right thing...
+	var sam int16
+
+	if bits_per_sample == 8 {
+		var x1 = src.GetByte(a)
+		if x1 < 0 {
+			return (FSK_READ_ERR)
+		}
+
+		dwutil.Assert(x1 >= 0 && x1 <= 255)
+
+		/* Scale 0..255 into -32k..+32k */
+
+		sam = (int16(byte(x1&0xff)) - 128) * 256
+	} else {
+		var x1 = src.GetByte(a) /* lower byte first */
+		if x1 < 0 {
+			return (FSK_READ_ERR)
+		}
+
+		var x2 = src.GetByte(a)
+		if x2 < 0 {
+			return (FSK_READ_ERR)
+		}
+
+		dwutil.Assert(x1 >= 0 && x1 <= 255)
+		dwutil.Assert(x2 >= 0 && x2 <= 255)
+
+		sam = int16(byte(x2&0xff))<<8 | int16(byte(x1&0xff))
+	}
+
+	return int(sam)
 }

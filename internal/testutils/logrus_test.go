@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,4 +52,22 @@ func TestCaptureLogrusPutsTheHooksBack(t *testing.T) {
 	})
 
 	assert.Len(t, logrus.StandardLogger().Hooks[logrus.InfoLevel], before)
+}
+
+// The last matching entry is the one wanted, even with others after it, and
+// nothing at all is nil.
+func TestLastEntryWithMessage(t *testing.T) {
+	t.Parallel()
+
+	var logger, hook = test.NewNullLogger()
+
+	assert.Nil(t, LastEntryWithMessage(hook, "wanted"))
+
+	logger.WithField("n", 1).Info("wanted")
+	logger.WithField("n", 2).Info("wanted")
+	logger.Info("something else")
+
+	var entry = LastEntryWithMessage(hook, "wanted")
+	require.NotNil(t, entry)
+	assert.Equal(t, 2, entry.Data["n"])
 }

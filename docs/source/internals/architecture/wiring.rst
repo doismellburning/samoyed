@@ -368,6 +368,8 @@ References
 - ``internal/ptt/ptt.go``: ``New``,
   handed each channel's configuration by ``RadioConfig.pttChannels`` (``internal/direwolf/channel_config.go``),
   which asks ``AudioDevices.channelCanTransmit`` (``audio.go``) whether each channel has an audio output.
+- ``internal/demod/demod.go``: ``New``, which ``demod_init`` (``multi_modem.go``) calls for each radio channel,
+  and ``BitReceiver`` and ``Demodulator.SetReceiver``, which hand each demodulator's bits to the ``Layer2Receiver``.
 - The digipeaters' constructors, and what they take,
   in ``internal/digipeater``:
   ``digipeater.go`` (``New``, ``Port``)

@@ -72,6 +72,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/demod"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/eas"
@@ -129,7 +130,7 @@ type MultiModem struct {
 
 // channelDemodulator is what a MultiModem asks of its channel's demodulator:
 // to take each audio sample, and how many subchannels and slicers it has.
-// *Demodulator is one.
+// *demod.Demodulator is one.
 type channelDemodulator interface {
 	ProcessSample(subchan int, sam int)
 	NumSubchan() int
@@ -138,11 +139,11 @@ type channelDemodulator interface {
 
 // newMultiModem builds the MultiModem for a channel, which hands what it
 // picks to sink.  demodulator is nil for a channel that is not a radio.
-func newMultiModem(channel int, pa *RadioConfig, demodulator *Demodulator, receiver *Layer2Receiver, sink ReceiveSink) *MultiModem {
+func newMultiModem(channel int, pa *RadioConfig, demodulator *demod.Demodulator, receiver *Layer2Receiver, sink ReceiveSink) *MultiModem {
 	var m = new(MultiModem)
 	m.channel = channel
 	m.audioConfig = pa
-	// Only a real one: a nil *Demodulator would make an interface that isn't
+	// Only a real one: a nil *demod.Demodulator would make an interface that isn't
 	// nil, and the MultiModem tells a channel with no radio by nil.
 	if demodulator != nil {
 		m.demodulator = demodulator
@@ -212,6 +213,50 @@ func (s *radioSink) DCDChange(channel int, state int) {
 	}
 }
 
+/*------------------------------------------------------------------
+ *
+ * Name:        demod_init
+ *
+ * Purpose:     Initialize the demodulator(s) used for reception.
+ *
+ * Inputs:      pa		- Pointer to RadioConfig structure with
+ *				  various parameters for the modem(s).
+ *
+ * Bugs:	This doesn't do much error checking so don't give it
+ *		anything crazy.
+ *
+ *----------------------------------------------------------------*/
+
+// demod_init builds a Demodulator for each radio channel, and returns them;
+// a channel that is not a radio has none.
+func demod_init(pa *RadioConfig) ([MAX_RADIO_CHANS]*demod.Demodulator, error) {
+	var demodulators [MAX_RADIO_CHANS]*demod.Demodulator
+
+	for channel := range MAX_RADIO_CHANS {
+		if pa.chan_medium[channel] == MEDIUM_RADIO {
+			var demodulator, err = demod.New(channel, pa.achan[channel].ModemConfig, pa.achan[channel].layer2_xmit, pa.adev[ACHAN2ADEV(channel)].samples_per_sec)
+			if err != nil {
+				return [MAX_RADIO_CHANS]*demod.Demodulator{}, err
+			}
+
+			demodulators[channel] = demodulator
+		}
+
+		// FIXME dw_printf ("-------- end of loop for chn %d \n", channel);
+	} /* for chan ... */
+
+	// Now the virtual channels.  FIXME:  could be single loop.
+
+	for channel := MAX_RADIO_CHANS; channel < MAX_TOTAL_CHANS; channel++ {
+		// FIXME dw_printf ("-------- virtual channel loop %d \n", channel);
+		if channel == pa.igate_vchannel {
+			logrus.WithField("channel", channel).Info("IGate virtual channel")
+		}
+	}
+
+	return demodulators, nil
+} /* end demod_init */
+
 /*------------------------------------------------------------------------------
  *
  * Name:	multi_modem_init
@@ -244,7 +289,7 @@ func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink Receiv
 
 	for _, d := range demodulators {
 		if d != nil {
-			d.setReceiver(receiver)
+			d.SetReceiver(receiver)
 		}
 	}
 
@@ -663,7 +708,7 @@ type Layer2Receiver struct {
 
 	// demods are each radio channel's demodulators, which hand their bits
 	// here; nil for a channel that is not a radio.
-	demods [MAX_RADIO_CHANS]*Demodulator
+	demods [MAX_RADIO_CHANS]*demod.Demodulator
 
 	// modems are each channel's MultiModem, which pick the best of what the
 	// channel's slicers decode.  None is nil.
@@ -719,7 +764,7 @@ const hdlcRecRandMax int32 = 0x7fffffff
  *
  ***********************************************************************************/
 
-func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx25Debug int, il2pDebug int, sink ReceiveSink) *Layer2Receiver {
+func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*demod.Demodulator, fx25Debug int, il2pDebug int, sink ReceiveSink) *Layer2Receiver {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("NewLayer2Receiver (%p) \n", pa);
 

@@ -29,7 +29,7 @@ to the application layer and the AX.25 data link state machine.
            get [label="demod_get_sample"];
            dtmf [label="dtmf.Decoder.Sample\n-> onButton (ttGateway.Button)"];
            mm [label="Layer2Receiver.ProcessSample\n-> MultiModem.ProcessSample\nDC average, fan out to subchannels"];
-           demod [label="Demodulator.ProcessSample\naudio level, decimation, pick modem"];
+           demod [label="demod.Demodulator.ProcessSample\naudio level, decimation, pick modem"];
            afsk [label="demod_afsk_process_sample"];
            psk [label="demod_psk_process_sample"];
            g96 [label="demod_9600_process_sample"];

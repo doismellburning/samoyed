@@ -1,6 +1,12 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
-import "github.com/doismellburning/samoyed/internal/dsp"
+package demod
+
+import (
+	"github.com/doismellburning/samoyed/internal/dsp"
+	"github.com/doismellburning/samoyed/internal/phy"
+)
 
 /*
  * Demodulator state.
@@ -17,11 +23,11 @@ type demodulator_state_s struct {
 	/*
 	 * These are set once during initialization.
 	 */
-	modem_type modem_t // MODEM_AFSK, MODEM_8PSK, etc.
+	modem_type phy.Modem // MODEM_AFSK, MODEM_8PSK, etc.
 
 	// receiver is where the bits demodulated go, and is told when data
-	// starts and stops being detected.  multi_modem_init sets it.
-	receiver bitReceiver
+	// starts and stops being detected.  Demodulator.SetReceiver sets it.
+	receiver BitReceiver
 
 	//	enum v26_e v26_alt;			// Which alternative when V.26.
 
@@ -169,7 +175,7 @@ type demodulator_state_s struct {
 	 * we are passing around the origin.
 	 *
 	 */
-	slicer [MAX_SLICERS]struct {
+	slicer [phy.MaxSlicers]struct {
 		data_clock_pll int32 // PLL for data clock recovery.
 		// It is incremented by pll_step_per_sample
 		// for each audio sample.
@@ -316,7 +322,7 @@ type demodulator_state_s struct {
 		//////////////////////////////////////////////////////////////////////////////////
 
 		psk struct {
-			v26_alt v26_e // Which alternative when V.26.
+			v26_alt phy.V26 // Which alternative when V.26.
 
 			sin_table256 [256]float64 // Precomputed sin table for speed.
 

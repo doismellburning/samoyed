@@ -38,6 +38,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/doismellburning/samoyed/internal/coordconvutil"
+	"github.com/doismellburning/samoyed/internal/demod"
 	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/hamlib"
@@ -1628,7 +1629,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 		if ps.audio.chan_medium[channel] == MEDIUM_RADIO {
 			var samplesPerSec = ps.audio.adev[ACHAN2ADEV(channel)].samples_per_sec
 
-			var err = checkPSKFilterSizes(channel, ps.audio.achan[channel].ModemConfig, samplesPerSec)
+			var err = demod.CheckPSKFilterSizes(channel, ps.audio.achan[channel].ModemConfig, samplesPerSec)
 			if err != nil {
 				ps.report(err)
 			}

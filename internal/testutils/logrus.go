@@ -5,6 +5,7 @@ package testutils
 
 import (
 	"io"
+	"slices"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -35,4 +36,18 @@ func CaptureLogrus(tb testing.TB) *test.Hook {
 	tb.Cleanup(func() { logrus.StandardLogger().ReplaceHooks(saved) })
 
 	return test.NewGlobal()
+}
+
+// LastEntryWithMessage returns the last entry hook saw with message, or nil if
+// there was none: other entries can follow the one a test is after.
+func LastEntryWithMessage(hook *test.Hook, message string) *logrus.Entry {
+	var entries = hook.AllEntries()
+
+	for _, entry := range slices.Backward(entries) {
+		if entry.Message == message {
+			return entry
+		}
+	}
+
+	return nil
 }
