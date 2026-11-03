@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/agwclient"
 	"github.com/doismellburning/samoyed/internal/bbs/config"
@@ -33,6 +34,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
 	"github.com/doismellburning/samoyed/internal/bbs/transport/agwt"
 	"github.com/doismellburning/samoyed/internal/bbs/transport/console"
+	"github.com/doismellburning/samoyed/internal/bbs/webui"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/sirupsen/logrus"
@@ -165,6 +167,18 @@ func serveAGW(ctx context.Context, cfg config.Config, agwCfg agwclient.Config) e
 
 	defer func() { _ = store.Close() }()
 
+	// Bound before anything starts, so an address in use is reported now.
+	var web maybe.Maybe[*webui.Server]
+
+	if addr, ok := cfg.WebAddr().Get(); ok {
+		var server, webErr = webui.NewServer(ctx, addr)
+		if webErr != nil {
+			return fmt.Errorf("web interface: %w", webErr)
+		}
+
+		web = maybe.Just(server)
+	}
+
 	var client = agwclient.New(agwCfg)
 	var listener = agwt.NewListener(client.Accept, agwt.DefaultDrainTimeout)
 	var busy = new(dispatcher.Busy)
@@ -192,6 +206,14 @@ func serveAGW(ctx context.Context, cfg config.Config, agwCfg agwclient.Config) e
 	group.Go(func() error { return client.Run(groupCtx) })
 	group.Go(func() error { return acceptSessions(groupCtx, listener, d) })
 	group.Go(func() error { return runScheduler(groupCtx, client.Ready(), sched) })
+
+	if server, ok := web.Get(); ok {
+		logrus.WithField("addr", server.Addr().String()).Info("Serving the web interface")
+
+		var handler = webui.Handler(store, webInfo(cfg, time.Now()), nil)
+
+		group.Go(func() error { return server.Serve(groupCtx, handler) })
+	}
 
 	return group.Wait()
 }

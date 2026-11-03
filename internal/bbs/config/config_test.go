@@ -390,3 +390,25 @@ func TestParseFBB(t *testing.T) {
 	require.NoError(t, onErr)
 	assert.True(t, on.UseFBB())
 }
+
+func TestParseWeb(t *testing.T) {
+	t.Parallel()
+
+	var cfg, err = ParseWithEnv(underBBS("call: Q1BBS\nstore: bbs.db\nagw:\n  addr: localhost:8000\nweb:\n  addr: 127.0.0.1:8081\n"), env(nil))
+	require.NoError(t, err)
+	assert.Equal(t, maybe.Just("127.0.0.1:8081"), cfg.WebAddr())
+
+	var without, withoutErr = ParseWithEnv(underBBS("call: Q1BBS\nstore: bbs.db\n"), env(nil))
+	require.NoError(t, withoutErr)
+	assert.True(t, without.WebAddr().IsNothing())
+}
+
+func TestParseWebProblems(t *testing.T) {
+	t.Parallel()
+
+	var _, err = ParseWithEnv(underBBS("call: Q1BBS\nstore: bbs.db\nweb:\n  addr: localhost\n"), env(nil))
+	require.Error(t, err)
+
+	assert.Contains(t, err.Error(), `bbs.web.addr: "localhost" is not a host:port`)
+	assert.Contains(t, err.Error(), "bbs.web: the web interface is served alongside an agw block, and there isn't one")
+}

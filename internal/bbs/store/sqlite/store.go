@@ -587,3 +587,81 @@ func (s *Store) finishForward(ctx context.Context, n int, partner string, state 
 
 	return tx.Commit()
 }
+
+// ForwardEntries is message n's place in each partner's queue it was put in,
+// by partner.
+func (s *Store) ForwardEntries(ctx context.Context, n int) ([]mail.ForwardEntry, error) {
+	var rows, err = s.db.QueryContext(ctx,
+		"SELECT msg, partner, state, attempts, last_try FROM forward_queue WHERE msg = ? ORDER BY partner", n)
+	if err != nil {
+		return nil, fmt.Errorf("reading the queue for message %d: %w", n, err)
+	}
+
+	defer func() { _ = rows.Close() }()
+
+	var entries []mail.ForwardEntry
+
+	for rows.Next() {
+		var entry = new(mail.ForwardEntry)
+		var state string
+		var lastTry sql.NullInt64
+
+		var scanErr = rows.Scan(&entry.Msg, &entry.Partner, &state, &entry.Attempts, &lastTry)
+		if scanErr != nil {
+			return nil, fmt.Errorf("reading the queue for message %d: %w", n, scanErr)
+		}
+
+		entry.State = mail.ForwardState(state)
+		entry.LastTry = unixTime(lastTry)
+
+		entries = append(entries, *entry)
+	}
+
+	return entries, rows.Err()
+}
+
+// ForwardTotals is how forwarding stands with each partner anything has been
+// queued for, by partner.
+func (s *Store) ForwardTotals(ctx context.Context) ([]mail.PartnerTotals, error) {
+	var rows, err = s.db.QueryContext(ctx,
+		`SELECT q.partner,
+		        COALESCE(SUM(q.state = 'pending' AND m.status != ?), 0),
+		        COALESCE(SUM(q.state = 'forwarded'), 0),
+		        COALESCE(SUM(q.state = 'refused'), 0),
+		        COALESCE(SUM(q.state = 'held'), 0),
+		        MAX(q.last_try)
+		 FROM forward_queue q JOIN messages m ON m.number = q.msg
+		 GROUP BY q.partner ORDER BY q.partner`, mail.Killed.String())
+	if err != nil {
+		return nil, fmt.Errorf("reading the queue totals: %w", err)
+	}
+
+	defer func() { _ = rows.Close() }()
+
+	var totals []mail.PartnerTotals
+
+	for rows.Next() {
+		var t = new(mail.PartnerTotals)
+		var lastTry sql.NullInt64
+
+		var scanErr = rows.Scan(&t.Partner, &t.Pending, &t.Forwarded, &t.Refused, &t.Held, &lastTry)
+		if scanErr != nil {
+			return nil, fmt.Errorf("reading the queue totals: %w", scanErr)
+		}
+
+		t.LastTry = unixTime(lastTry)
+
+		totals = append(totals, *t)
+	}
+
+	return totals, rows.Err()
+}
+
+// unixTime is a nullable Unix seconds column as a time, or Nothing for NULL.
+func unixTime(column sql.NullInt64) maybe.Maybe[time.Time] {
+	if !column.Valid {
+		return maybe.Nothing[time.Time]()
+	}
+
+	return maybe.Just(time.Unix(column.Int64, 0).UTC())
+}

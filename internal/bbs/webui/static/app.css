@@ -1,0 +1,138 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Samoyed Authors
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #dde1e6;
+  --text: #1c2128;
+  --muted: #5d6673;
+  --accent: #2563eb;
+  --good: #15803d;
+  --warn: #b45309;
+  --bad: #b91c1c;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216;
+    --surface: #171b21;
+    --border: #2a313a;
+    --text: #e6e9ee;
+    --muted: #9aa4b2;
+    --accent: #60a5fa;
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --bad: #f87171;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+h1 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 8px; font-family: var(--mono); }
+h2 { font-size: 15px; margin: 24px 0 8px; }
+h3 { font-size: 14px; margin: 20px 0 8px; }
+
+nav { display: flex; gap: 4px; }
+nav a {
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: var(--text);
+  text-decoration: none;
+}
+nav a[aria-current="page"] { background: var(--accent); color: var(--surface); }
+
+a { color: var(--accent); }
+
+.muted { color: var(--muted); }
+.badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+main { padding: 16px; max-width: 1200px; }
+
+.error { color: var(--bad); }
+.empty { color: var(--muted); }
+
+table {
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  width: 100%;
+}
+th, td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+th { color: var(--muted); font-weight: 600; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.mono, .mono { font-family: var(--mono); }
+.counts { width: auto; }
+
+tr.clickable { cursor: pointer; }
+tr.clickable:hover { background: var(--bg); }
+
+.status-H, .state-held { color: var(--bad); font-weight: 600; }
+.status-K { color: var(--muted); text-decoration: line-through; }
+.status-N, .state-pending { color: var(--warn); }
+.status-F, .state-forwarded { color: var(--good); }
+
+.settings {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+.settings dt { color: var(--muted); }
+.settings dd { margin: 0; font-family: var(--mono); }
+
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 12px; }
+.filters label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 12px; }
+
+pre {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 12px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.partner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+.partner h3 { margin: 0 0 8px; font-family: var(--mono); }
+.partner .totals { display: flex; gap: 16px; margin-bottom: 8px; }
