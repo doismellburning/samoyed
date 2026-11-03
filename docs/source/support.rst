@@ -11,6 +11,9 @@ Questions, problems and reports of Samoyed working go to
 `GitHub issues <https://github.com/doismellburning/samoyed/issues>`__.
 Search there first, in case someone has already asked.
 
+For a chat, or a question that isn't quite an issue yet,
+there is also a `Discord server <https://discord.gg/RwfDNCx4nm>`__.
+
 Samoyed is pre-release,
 and its automated tests run against audio files and loopback rather than real radios,
 so a report of it working on the air is as useful as one of it failing.

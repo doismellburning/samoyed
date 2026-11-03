@@ -21,6 +21,10 @@ so an existing ``direwolf.conf`` should work as it is.
    :alt: Latest release
    :target: https://github.com/doismellburning/samoyed/releases
 
+.. image:: https://img.shields.io/badge/chat-Discord-5865F2?logo=discord&logoColor=white
+   :alt: Discord
+   :target: https://discord.gg/RwfDNCx4nm
+
 .. image:: https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue
    :alt: Licence: AGPL-3.0-or-later
    :target: https://github.com/doismellburning/samoyed#license

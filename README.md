@@ -5,6 +5,7 @@
 [![Build and test](https://github.com/doismellburning/samoyed/actions/workflows/build-and-test.yml/badge.svg?branch=main)](https://github.com/doismellburning/samoyed/actions/workflows/build-and-test.yml?query=branch%3Amain)
 [![Latest release](https://img.shields.io/github/v/release/doismellburning/samoyed?include_prereleases&sort=semver)](https://github.com/doismellburning/samoyed/releases)
 [![Documentation](https://img.shields.io/badge/docs-github.io-blue)](https://doismellburning.github.io/samoyed/)
+[![Discord](https://img.shields.io/badge/chat-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/RwfDNCx4nm)
 [![Licence: AGPL-3.0-or-later](https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue)](#license)
 
 Samoyed is a soundcard modem, software TNC and NET/ROM node for amateur packet radio, written in Go.
