@@ -11,6 +11,10 @@ Questions, problems and reports of Samoyed working go to
 `GitHub issues <https://github.com/doismellburning/samoyed/issues>`__.
 Search there first, in case someone has already asked.
 
+A security problem goes privately by email instead -
+`SECURITY.md <https://github.com/doismellburning/samoyed/blob/main/SECURITY.md>`__
+says where, and what counts.
+
 For a chat, or a question that isn't quite an issue yet,
 there is also a `Discord server <https://discord.gg/RwfDNCx4nm>`__.
 
